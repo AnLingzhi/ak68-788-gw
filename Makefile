@@ -1,7 +1,7 @@
 # WebSocket AT Gateway 交叉编译Makefile
 
 # 目标架构
-TARGETS = aarch64-unknown-linux-gnu armv7-unknown-linux-gnueabihf x86_64-unknown-linux-gnu
+TARGETS = aarch64-unknown-linux-musl aarch64-unknown-linux-gnu armv7-unknown-linux-gnueabihf x86_64-unknown-linux-gnu
 
 # 默认目标
 .PHONY: all clean help
@@ -12,6 +12,7 @@ help:
 	@echo "WebSocket AT Gateway 交叉编译"
 	@echo "=========================="
 	@echo "可用目标:"
+	@echo "  make musl        - 编译aarch64 musl版本 (OpenWRT推荐)"
 	@echo "  make aarch64     - 编译aarch64版本 (适合大多数OpenWrt)"
 	@echo "  make armv7       - 编译ARMv7版本"
 	@echo "  make x86_64      - 编译x86_64版本"
@@ -20,11 +21,16 @@ help:
 	@echo "  make github      - 使用GitHub Actions编译"
 	@echo ""
 	@echo "OpenWrt架构选择:"
+	@echo "  musl:    OpenWRT专用静态链接版本 (推荐)"
 	@echo "  aarch64: 新ARM64设备 (如Raspberry Pi 4, 大多数现代路由器)"
 	@echo "  armv7:   老ARM设备 (如Raspberry Pi 2/3)"
 	@echo "  x86_64:  x86设备 (如PC, 虚拟机)"
 
 # 单独架构编译
+musl:
+	@echo "编译 aarch64-unknown-linux-musl (OpenWRT静态链接版)..."
+	cargo build --release --target aarch64-unknown-linux-musl
+
 aarch64:
 	@echo "编译 aarch64-unknown-linux-gnu..."
 	./build.sh -a aarch64

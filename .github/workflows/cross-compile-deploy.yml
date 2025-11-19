@@ -13,7 +13,8 @@ jobs:
     strategy:
       matrix:
         target:
-          - aarch64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu    # GNU libc 版本
+          - aarch64-unknown-linux-musl   # MUSL libc 静态链接版本
           - armv7-unknown-linux-gnueabihf
           - x86_64-unknown-linux-gnu
     
@@ -33,6 +34,11 @@ jobs:
           sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
           echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
           echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+        elif [[ "${{ matrix.target }}" == "aarch64-unknown-linux-musl" ]]; then
+          sudo apt-get install -y gcc-aarch64-linux-gnu musl-tools
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "CC_aarch64_unknown_linux_musl=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "RUSTFLAGS=-C target-feature=+crt-static" >> $GITHUB_ENV
         elif [[ "${{ matrix.target }}" == "armv7-unknown-linux-gnueabihf" ]]; then
           sudo apt-get install -y gcc-arm-linux-gnueabihf libc6-dev-armhf-cross
           echo "CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
@@ -113,7 +119,8 @@ jobs:
           🔢 运行编号: #${{ github.run_number }}
           
           ## 📦 包含架构
-          - **aarch64-unknown-linux-gnu** (ARM64, 适合大多数现代OpenWrt设备)
+          - **aarch64-unknown-linux-musl** (ARM64 静态链接, 推荐用于OpenWRT)
+          - **aarch64-unknown-linux-gnu** (ARM64 GNU libc, 适合标准Linux系统)
           - **armv7-unknown-linux-gnueabihf** (ARMv7, 适合老ARM设备)  
           - **x86_64-unknown-linux-gnu** (x86_64, 适合PC和虚拟机)
           
@@ -123,7 +130,10 @@ jobs:
           ```bash
           # 根据你的设备架构选择对应的命令
           
-          # ARM64 (大多数现代路由器)
+          # ARM64 OpenWRT (推荐 - 静态链接，无依赖)
+          wget https://github.com/${{ github.repository }}/releases/download/v${{ github.run_number }}/websocket-at-gateway-aarch64-unknown-linux-musl.tar.gz
+          
+          # ARM64 标准Linux (GNU libc)
           wget https://github.com/${{ github.repository }}/releases/download/v${{ github.run_number }}/websocket-at-gateway-aarch64-unknown-linux-gnu.tar.gz
           
           # ARMv7 (老设备)
@@ -157,6 +167,7 @@ jobs:
           - 符号剥离: 启用
           - 文件大小: 已优化至最小
         files: |
+          artifacts/websocket-at-gateway-aarch64-unknown-linux-musl-release/websocket-at-gateway-aarch64-unknown-linux-musl.tar.gz
           artifacts/websocket-at-gateway-aarch64-unknown-linux-gnu-release/websocket-at-gateway-aarch64-unknown-linux-gnu.tar.gz
           artifacts/websocket-at-gateway-armv7-unknown-linux-gnueabihf-release/websocket-at-gateway-armv7-unknown-linux-gnueabihf.tar.gz
           artifacts/websocket-at-gateway-x86_64-unknown-linux-gnu-release/websocket-at-gateway-x86_64-unknown-linux-gnu.tar.gz
