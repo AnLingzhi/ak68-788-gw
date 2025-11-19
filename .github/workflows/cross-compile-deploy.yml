@@ -1,0 +1,179 @@
+name: Cross Compile and Deploy for OpenWrt
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - aarch64-unknown-linux-gnu
+          - armv7-unknown-linux-gnueabihf
+          - x86_64-unknown-linux-gnu
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+    
+    - name: Install cross-compilation tools
+      run: |
+        sudo apt-get update
+        if [[ "${{ matrix.target }}" == "aarch64-unknown-linux-gnu" ]]; then
+          sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+        elif [[ "${{ matrix.target }}" == "armv7-unknown-linux-gnueabihf" ]]; then
+          sudo apt-get install -y gcc-arm-linux-gnueabihf libc6-dev-armhf-cross
+          echo "CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
+          echo "CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
+        fi
+    
+    - name: Build
+      run: |
+        cargo build --release --target ${{ matrix.target }}
+        ls -lh target/${{ matrix.target }}/release/websocket-at-gateway
+        file target/${{ matrix.target }}/release/websocket-at-gateway
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: websocket-at-gateway-${{ matrix.target }}
+        path: target/${{ matrix.target }}/release/websocket-at-gateway
+    
+    - name: Create release archive
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: |
+        cd target/${{ matrix.target }}/release
+        tar -czf websocket-at-gateway-${{ matrix.target }}.tar.gz websocket-at-gateway
+        cd -
+        mv target/${{ matrix.target }}/release/websocket-at-gateway-${{ matrix.target }}.tar.gz .
+    
+    - name: Upload release artifact
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: actions/upload-artifact@v4
+      with:
+        name: websocket-at-gateway-${{ matrix.target }}-release
+        path: websocket-at-gateway-${{ matrix.target }}.tar.gz
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: websocket-at-gateway-*-release
+        path: artifacts
+    
+    - name: Display structure of downloaded files
+      run: ls -R artifacts
+    
+    - name: Get commit info
+      id: commit_info
+      run: |
+        echo "COMMIT_TIME=$(git show -s --format=%ci ${{ github.sha }})" >> $GITHUB_OUTPUT
+        echo "COMMIT_MESSAGE=$(git show -s --format=%s ${{ github.sha }})" >> $GITHUB_OUTPUT
+        echo "COMMIT_AUTHOR=$(git show -s --format=%an ${{ github.sha }})" >> $GITHUB_OUTPUT
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ github.run_number }}
+        name: Release v${{ github.run_number }}
+        draft: false
+        prerelease: false
+        body: |
+          WebSocket AT Gateway 自动构建版本
+          
+          📅 构建时间: ${{ steps.commit_info.outputs.COMMIT_TIME }}
+          📝 提交信息: ${{ steps.commit_info.outputs.COMMIT_MESSAGE }}
+          👤 提交者: ${{ steps.commit_info.outputs.COMMIT_AUTHOR }}
+          🔢 运行编号: #${{ github.run_number }}
+          
+          ## 📦 包含架构
+          - **aarch64-unknown-linux-gnu** (ARM64, 适合大多数现代OpenWrt设备)
+          - **armv7-unknown-linux-gnueabihf** (ARMv7, 适合老ARM设备)  
+          - **x86_64-unknown-linux-gnu** (x86_64, 适合PC和虚拟机)
+          
+          ## 🚀 快速安装
+          
+          ### 方法1: 直接下载安装
+          ```bash
+          # 根据你的设备架构选择对应的命令
+          
+          # ARM64 (大多数现代路由器)
+          wget https://github.com/${{ github.repository }}/releases/download/v${{ github.run_number }}/websocket-at-gateway-aarch64-unknown-linux-gnu.tar.gz
+          
+          # ARMv7 (老设备)
+          wget https://github.com/${{ github.repository }}/releases/download/v${{ github.run_number }}/websocket-at-gateway-armv7-unknown-linux-gnueabihf.tar.gz
+          
+          # x86_64 (PC/虚拟机)
+          wget https://github.com/${{ github.repository }}/releases/download/v${{ github.run_number }}/websocket-at-gateway-x86_64-unknown-linux-gnu.tar.gz
+          
+          # 解压并安装
+          tar -xzf websocket-at-gateway-*.tar.gz
+          scp websocket-at-gateway root@your-openwrt-ip:/usr/bin/
+          ssh root@your-openwrt-ip "chmod +x /usr/bin/websocket-at-gateway"
+          ```
+          
+          ### 方法2: 使用Makefile安装
+          在本地克隆仓库后，可以直接安装到OpenWrt设备:
+          ```bash
+          make install IP=192.168.1.1 ARCH=aarch64
+          ```
+          
+          支持的架构: `aarch64`, `armv7`, `x86_64`
+          
+          ## 📋 系统要求
+          - OpenWrt 或其他基于Linux的系统
+          - 对应的CPU架构支持
+          - 足够的存储空间 (约2-5MB)
+          
+          ## 🔧 编译信息
+          - 优化级别: 大小优化 (`opt-level = "z"`)
+          - 链接时优化: 启用 (LTO)
+          - 符号剥离: 启用
+          - 文件大小: 已优化至最小
+        files: |
+          artifacts/websocket-at-gateway-aarch64-unknown-linux-gnu-release/websocket-at-gateway-aarch64-unknown-linux-gnu.tar.gz
+          artifacts/websocket-at-gateway-armv7-unknown-linux-gnueabihf-release/websocket-at-gateway-armv7-unknown-linux-gnueabihf.tar.gz
+          artifacts/websocket-at-gateway-x86_64-unknown-linux-gnu-release/websocket-at-gateway-x86_64-unknown-linux-gnu.tar.gz
+
+  notify:
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Notify deployment status
+      run: |
+        if [[ "${{ needs.build.result }}" == "success" && "${{ needs.deploy.result }}" == "success" ]]; then
+          echo "✅ 构建和部署成功！"
+          echo "📦 新版本已发布: v${{ github.run_number }}"
+          echo "🔗 下载地址: https://github.com/${{ github.repository }}/releases/tag/v${{ github.run_number }}"
+        else
+          echo "❌ 构建或部署失败"
+          echo "请检查GitHub Actions日志获取详细信息"
+        fi
