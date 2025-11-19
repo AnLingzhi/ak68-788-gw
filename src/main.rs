@@ -9,7 +9,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize simple logging
     tracing_subscriber::fmt::init();
     
-    let addr = "127.0.0.1:8080";
+    let addr = "0.0.0.0:8080";
     let listener = TcpListener::bind(addr).await?;
     info!("WebSocket AT Gateway listening on: {}", addr);
 
