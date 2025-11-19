@@ -1,0 +1,18 @@
+[package]
+name = "websocket-at-gateway"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+tokio-tungstenite = "0.20"
+futures-util = "0.3"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+[profile.release]
+opt-level = "z"     # 优化大小
+lto = true          # 启用链接时优化
+codegen-units = 1   # 单一代码生成单元
+strip = true        # 剥离符号
+panic = "abort"     # 使用abort而不是unwind
