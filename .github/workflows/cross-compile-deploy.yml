@@ -112,9 +112,11 @@ jobs:
     - name: Collect IPK file paths
       id: collect_ipk
       run: |
-        echo "files<<EOF" >> $GITHUB_OUTPUT
-        find artifacts -type f -name '*.ipk'
-        echo "EOF" >> $GITHUB_OUTPUT
+        {
+          echo "files<<EOF"
+          find artifacts -type f -name '*.ipk'
+          echo "EOF"
+        } >> $GITHUB_OUTPUT
     - name: Create Release
       uses: softprops/action-gh-release@v1
       env:
