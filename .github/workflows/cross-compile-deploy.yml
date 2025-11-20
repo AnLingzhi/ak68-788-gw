@@ -50,6 +50,22 @@ jobs:
         cargo build --release --target ${{ matrix.target }}
         ls -lh target/${{ matrix.target }}/release/websocket-at-gateway
         file target/${{ matrix.target }}/release/websocket-at-gateway
+    - name: Build IPK
+      run: |
+        case "${{ matrix.target }}" in
+          aarch64-unknown-linux-musl|aarch64-unknown-linux-gnu) OW_ARCH="aarch64" ;;
+          armv7-unknown-linux-gnueabihf) OW_ARCH="armv7" ;;
+          x86_64-unknown-linux-gnu) OW_ARCH="x86_64" ;;
+        esac
+        VERSION=$(sed -n 's/^version\s*=\s*"\([^"]\+\)"/\1/p' Cargo.toml | head -n1)
+        BIN="target/${{ matrix.target }}/release/websocket-at-gateway"
+        OUTDIR="ipk"
+        ARCH="$OW_ARCH" VERSION="$VERSION" RELEASE="$GITHUB_RUN_NUMBER" BIN="$BIN" OUTDIR="$OUTDIR" ./openwrt/scripts/make-ipk.sh
+    - name: Upload IPK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ipk-${{ matrix.target }}
+        path: ipk/*.ipk
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4
@@ -90,6 +106,11 @@ jobs:
       with:
         pattern: websocket-at-gateway-*-release
         path: artifacts
+    - name: Download IPK artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: ipk-*
+        path: artifacts
     
     - name: Display structure of downloaded files
       run: ls -R artifacts
@@ -101,6 +122,12 @@ jobs:
         echo "COMMIT_MESSAGE=$(git show -s --format=%s ${{ github.sha }})" >> $GITHUB_OUTPUT
         echo "COMMIT_AUTHOR=$(git show -s --format=%an ${{ github.sha }})" >> $GITHUB_OUTPUT
     
+    - name: Collect IPK file paths
+      id: collect_ipk
+      run: |
+        echo "files<<EOF" >> $GITHUB_OUTPUT
+        find artifacts -type f -name '*.ipk'
+        echo "EOF" >> $GITHUB_OUTPUT
     - name: Create Release
       uses: softprops/action-gh-release@v1
       env:
@@ -171,6 +198,7 @@ jobs:
           artifacts/websocket-at-gateway-aarch64-unknown-linux-gnu-release/websocket-at-gateway-aarch64-unknown-linux-gnu.tar.gz
           artifacts/websocket-at-gateway-armv7-unknown-linux-gnueabihf-release/websocket-at-gateway-armv7-unknown-linux-gnueabihf.tar.gz
           artifacts/websocket-at-gateway-x86_64-unknown-linux-gnu-release/websocket-at-gateway-x86_64-unknown-linux-gnu.tar.gz
+          ${{ steps.collect_ipk.outputs.files }}
 
   notify:
     needs: [build, deploy]
