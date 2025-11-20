@@ -3,13 +3,15 @@ use tokio_tungstenite::{accept_async, tungstenite::Message};
 use futures_util::{StreamExt, SinkExt};
 use tokio::process::Command;
 use tracing::{info, debug};
+use std::sync::{Arc, OnceLock};
+use tokio::sync::Semaphore;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize simple logging
     tracing_subscriber::fmt::init();
     
-    let addr = "0.0.0.0:8080";
+    let addr = "192.168.66.1:8765";
     let listener = TcpListener::bind(addr).await?;
     info!("WebSocket AT Gateway listening on: {}", addr);
 
@@ -64,6 +66,10 @@ async fn execute_at_command(command: &str) -> Result<String, String> {
         return Err("Command contains invalid characters".to_string());
     }
     
+    static SEM: OnceLock<Arc<Semaphore>> = OnceLock::new();
+    let sem = SEM.get_or_init(|| Arc::new(Semaphore::new(1))).clone();
+    let _permit = sem.acquire_owned().await.map_err(|e| format!("Semaphore error: {}", e))?;
+
     // Execute cpetools.sh
     let output = Command::new("cpetools.sh")
         .args(&["-t0", "-c", command])
