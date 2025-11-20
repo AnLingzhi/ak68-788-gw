@@ -50,6 +50,10 @@ jobs:
         cargo build --release --target ${{ matrix.target }}
         ls -lh target/${{ matrix.target }}/release/websocket-at-gateway
         file target/${{ matrix.target }}/release/websocket-at-gateway
+    - name: Ensure packaging scripts executable
+      run: |
+        chmod +x openwrt/scripts/make-ipk.sh
+        chmod +x openwrt/init.d/websocket-at-gateway
     - name: Build IPK
       run: |
         case "${{ matrix.target }}" in
