@@ -48,9 +48,10 @@ mkdir -p "$OUTDIR"
 pushd "$WORKDIR/pkg" >/dev/null
 tar -czf control.tar.gz CONTROL
 tar -czf data.tar.gz etc usr
-echo -n "2.0\n" > debian-binary
+printf "2.0\n" > debian-binary
 IPK_NAME="${PKG_NAME}_${VERSION}-${RELEASE}_${ARCH}.ipk"
-ar -r "$IPK_NAME" control.tar.gz data.tar.gz debian-binary
+# 生成 ar 包时确保条目顺序：debian-binary, control.tar.gz, data.tar.gz
+ar -cr "$IPK_NAME" debian-binary control.tar.gz data.tar.gz
 popd >/dev/null
 mv "$WORKDIR/pkg/$IPK_NAME" "$OUTDIR/"
 echo "$OUTDIR/$IPK_NAME"

@@ -43,7 +43,7 @@ jobs:
         chmod +x openwrt/init.d/websocket-at-gateway
     - name: Build IPK
       run: |
-        OW_ARCH="aarch64"
+        OW_ARCH="aarch64_cortex-a53"
         VERSION=$(sed -n 's/^version\s*=\s*"\([^"]\+\)"/\1/p' Cargo.toml | head -n1)
         BIN="target/${{ matrix.target }}/release/websocket-at-gateway"
         OUTDIR="ipk"
@@ -158,7 +158,7 @@ jobs:
           make install IP=192.168.1.1 ARCH=aarch64
           ```
           
-          支持的架构: `aarch64`
+          支持的架构: `aarch64_cortex-a53`
           
           ## 📋 系统要求
           - OpenWrt 或其他基于Linux的系统
