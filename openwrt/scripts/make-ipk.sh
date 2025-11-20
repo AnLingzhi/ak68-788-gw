@@ -17,12 +17,12 @@ fi
 WORKDIR=$(mktemp -d)
 mkdir -p "$WORKDIR/pkg/usr/bin"
 mkdir -p "$WORKDIR/pkg/etc/init.d"
-mkdir -p "$WORKDIR/pkg/CONTROL"
 cp "$BIN" "$WORKDIR/pkg/usr/bin/$PKG_NAME"
 chmod +x "$WORKDIR/pkg/usr/bin/$PKG_NAME"
 cp "$(dirname "$0")/../init.d/$PKG_NAME" "$WORKDIR/pkg/etc/init.d/$PKG_NAME"
 chmod +x "$WORKDIR/pkg/etc/init.d/$PKG_NAME"
-cat > "$WORKDIR/pkg/CONTROL/control" <<EOF
+mkdir -p "$WORKDIR/control"
+cat > "$WORKDIR/control/control" <<EOF
 Package: $PKG_NAME
 Version: $VERSION-$RELEASE
 Depends: libc
@@ -32,27 +32,35 @@ Architecture: $ARCH
 Maintainer: ak68-788-gw
 Description: WebSocket AT Gateway
 EOF
-cat > "$WORKDIR/pkg/CONTROL/postinst" <<'EOF'
+cat > "$WORKDIR/control/postinst" <<'EOF'
 #!/bin/sh
 [ -x /etc/init.d/websocket-at-gateway ] && /etc/init.d/websocket-at-gateway enable || true
 exit 0
 EOF
-chmod +x "$WORKDIR/pkg/CONTROL/postinst"
-cat > "$WORKDIR/pkg/CONTROL/prerm" <<'EOF'
+chmod +x "$WORKDIR/control/postinst"
+cat > "$WORKDIR/control/prerm" <<'EOF'
 #!/bin/sh
 [ -x /etc/init.d/websocket-at-gateway ] && /etc/init.d/websocket-at-gateway stop || true
 exit 0
 EOF
-chmod +x "$WORKDIR/pkg/CONTROL/prerm"
+chmod +x "$WORKDIR/control/prerm"
+
 mkdir -p "$OUTDIR"
+pushd "$WORKDIR/control" >/dev/null
+tar -czf "$WORKDIR/control.tar.gz" .
+popd >/dev/null
+
 pushd "$WORKDIR/pkg" >/dev/null
-tar -czf control.tar.gz CONTROL
-tar -czf data.tar.gz etc usr
-printf "2.0\n" > debian-binary
+tar -czf "$WORKDIR/data.tar.gz" etc usr
+popd >/dev/null
+
+printf "2.0\n" > "$WORKDIR/debian-binary"
+
 IPK_NAME="${PKG_NAME}_${VERSION}-${RELEASE}_${ARCH}.ipk"
-# 生成 ar 包时确保条目顺序：debian-binary, control.tar.gz, data.tar.gz
+pushd "$WORKDIR" >/dev/null
 ar -cr "$IPK_NAME" debian-binary control.tar.gz data.tar.gz
 popd >/dev/null
-mv "$WORKDIR/pkg/$IPK_NAME" "$OUTDIR/"
+
+mv "$WORKDIR/$IPK_NAME" "$OUTDIR/"
 echo "$OUTDIR/$IPK_NAME"
 rm -rf "$WORKDIR"
