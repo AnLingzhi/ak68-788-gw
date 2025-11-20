@@ -37,22 +37,9 @@ jobs:
         cargo build --release --target ${{ matrix.target }}
         ls -lh target/${{ matrix.target }}/release/websocket-at-gateway
         file target/${{ matrix.target }}/release/websocket-at-gateway
-    - name: Ensure packaging scripts executable
+    - name: Ensure init script path info
       run: |
-        chmod +x openwrt/scripts/make-ipk.sh
-        chmod +x openwrt/init.d/websocket-at-gateway
-    - name: Build IPK
-      run: |
-        OW_ARCH="aarch64_cortex-a53"
-        VERSION=$(sed -n 's/^version\s*=\s*"\([^"]\+\)"/\1/p' Cargo.toml | head -n1)
-        BIN="target/${{ matrix.target }}/release/websocket-at-gateway"
-        OUTDIR="ipk"
-        ARCH="$OW_ARCH" VERSION="$VERSION" RELEASE="$GITHUB_RUN_NUMBER" BIN="$BIN" OUTDIR="$OUTDIR" ./openwrt/scripts/make-ipk.sh
-    - name: Upload IPK artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ipk-${{ matrix.target }}
-        path: ipk/*.ipk
+        echo "Init script: openwrt/init.d/websocket-at-gateway"
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4
@@ -93,11 +80,6 @@ jobs:
       with:
         pattern: websocket-at-gateway-*-release
         path: artifacts
-    - name: Download IPK artifacts
-      uses: actions/download-artifact@v4
-      with:
-        pattern: ipk-*
-        path: artifacts
     
     - name: Display structure of downloaded files
       run: ls -R artifacts
@@ -109,14 +91,6 @@ jobs:
         echo "COMMIT_MESSAGE=$(git show -s --format=%s ${{ github.sha }})" >> $GITHUB_OUTPUT
         echo "COMMIT_AUTHOR=$(git show -s --format=%an ${{ github.sha }})" >> $GITHUB_OUTPUT
     
-    - name: Collect IPK file paths
-      id: collect_ipk
-      run: |
-        {
-          echo "files<<EOF"
-          find artifacts -type f -name '*.ipk'
-          echo "EOF"
-        } >> $GITHUB_OUTPUT
     - name: Create Release
       uses: softprops/action-gh-release@v1
       env:
@@ -139,7 +113,7 @@ jobs:
           
           ## 🚀 快速安装
           
-          ### 方法1: 直接下载安装
+          ### 方法1: 直接下载安装（含开机自启）
           ```bash
           # 根据你的设备架构选择对应的命令
           
@@ -150,12 +124,13 @@ jobs:
           tar -xzf websocket-at-gateway-*.tar.gz
           scp websocket-at-gateway root@your-openwrt-ip:/usr/bin/
           ssh root@your-openwrt-ip "chmod +x /usr/bin/websocket-at-gateway"
-          ```
-          
-          ### 方法2: 使用Makefile安装
-          在本地克隆仓库后，可以直接安装到OpenWrt设备:
-          ```bash
-          make install IP=192.168.1.1 ARCH=aarch64
+
+          # 安装 OpenWrt init 脚本并设置开机自启
+          ssh root@your-openwrt-ip \
+            "wget -O /etc/init.d/websocket-at-gateway https://raw.githubusercontent.com/${{ github.repository }}/main/openwrt/init.d/websocket-at-gateway && \
+             chmod +x /etc/init.d/websocket-at-gateway && \
+             /etc/init.d/websocket-at-gateway enable && \
+             /etc/init.d/websocket-at-gateway start"
           ```
           
           支持的架构: `aarch64_cortex-a53`
@@ -172,7 +147,6 @@ jobs:
           - 文件大小: 已优化至最小
         files: |
           artifacts/websocket-at-gateway-aarch64-unknown-linux-musl-release/websocket-at-gateway-aarch64-unknown-linux-musl.tar.gz
-          ${{ steps.collect_ipk.outputs.files }}
 
   notify:
     needs: [build, deploy]
