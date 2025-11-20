@@ -51,7 +51,8 @@ jobs:
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |
         cd target/${{ matrix.target }}/release
-        tar -czf websocket-at-gateway-${{ matrix.target }}.tar.gz websocket-at-gateway
+        cp "$GITHUB_WORKSPACE/openwrt/init.d/websocket-at-gateway" websocket-at-gateway.init
+        tar -czf websocket-at-gateway-${{ matrix.target }}.tar.gz websocket-at-gateway websocket-at-gateway.init
         cd -
         mv target/${{ matrix.target }}/release/websocket-at-gateway-${{ matrix.target }}.tar.gz .
     
@@ -122,15 +123,11 @@ jobs:
           
           # 解压并安装
           tar -xzf websocket-at-gateway-*.tar.gz
-          scp websocket-at-gateway root@your-openwrt-ip:/usr/bin/
-          ssh root@your-openwrt-ip "chmod +x /usr/bin/websocket-at-gateway"
-
-          # 安装 OpenWrt init 脚本并设置开机自启
-          ssh root@your-openwrt-ip \
-            "wget -O /etc/init.d/websocket-at-gateway https://raw.githubusercontent.com/${{ github.repository }}/main/openwrt/init.d/websocket-at-gateway && \
-             chmod +x /etc/init.d/websocket-at-gateway && \
-             /etc/init.d/websocket-at-gateway enable && \
-             /etc/init.d/websocket-at-gateway start"
+          cp websocket-at-gateway /usr/bin/
+          cp websocket-at-gateway.init /etc/init.d/websocket-at-gateway
+          chmod +x /usr/bin/websocket-at-gateway /etc/init.d/websocket-at-gateway
+          /etc/init.d/websocket-at-gateway enable
+          /etc/init.d/websocket-at-gateway start
           ```
           
           支持的架构: `aarch64_cortex-a53`
